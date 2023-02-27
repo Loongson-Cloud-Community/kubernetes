@@ -42,8 +42,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"
 
-readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-k8s.gcr.io}"
-readonly KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-k8s.gcr.io/build-image}"
+readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-cr.loongnx.cn/kubernetes}"
+readonly KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-cr.loongnix.cn/k8s-build-image}"
 
 # This version number is used to cause everyone to rebuild their data containers
 # and build image.  This is especially useful for automated build systems like
@@ -93,8 +93,8 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 #
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
-  local debian_iptables_version=buster-v1.6.7
-  local go_runner_version=v2.3.1-go1.15.15-buster.0
+  local debian_iptables_version=latest
+  local go_runner_version=latest
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD. And kube::golang::server_image_targets
   local targets=(
