@@ -1,5 +1,6 @@
 // +build !linux !arm64
 // +build !linux !riscv64
+// +build !linux !loong64
 // +build !windows
 // +build !solaris
 
