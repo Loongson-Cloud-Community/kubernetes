@@ -1,10 +1,8 @@
 bbolt
 =====
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/etcd-io/bbolt?style=flat-square)](https://goreportcard.com/report/github.com/etcd-io/bbolt)
-[![Coverage](https://codecov.io/gh/etcd-io/bbolt/branch/master/graph/badge.svg)](https://codecov.io/gh/etcd-io/bbolt)
-[![Build Status Travis](https://img.shields.io/travis/etcd-io/bboltlabs.svg?style=flat-square&&branch=master)](https://travis-ci.com/etcd-io/bbolt)
-[![Godoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/etcd-io/bbolt)
+[![Go Report Card](https://goreportcard.com/badge/go.etcd.io/bbolt?style=flat-square)](https://goreportcard.com/report/go.etcd.io/bbolt)
+[![Go Reference](https://pkg.go.dev/badge/go.etcd.io/bbolt.svg)](https://pkg.go.dev/go.etcd.io/bbolt)
 [![Releases](https://img.shields.io/github/release/etcd-io/bbolt/all.svg?style=flat-square)](https://github.com/etcd-io/bbolt/releases)
 [![LICENSE](https://img.shields.io/github/license/etcd-io/bbolt.svg?style=flat-square)](https://github.com/etcd-io/bbolt/blob/master/LICENSE)
 
@@ -26,7 +24,7 @@ and setting values. That's it.
 [gh_ben]: https://github.com/benbjohnson
 [bolt]: https://github.com/boltdb/bolt
 [hyc_symas]: https://twitter.com/hyc_symas
-[lmdb]: http://symas.com/mdb/
+[lmdb]: https://www.symas.com/symas-embedded-database-lmdb
 
 ## Project Status
 
@@ -78,14 +76,23 @@ New minor versions may add additional features to the API.
 ### Installing
 
 To start using Bolt, install Go and run `go get`:
-
 ```sh
-$ go get go.etcd.io/bbolt/...
+$ go get go.etcd.io/bbolt@latest
 ```
 
-This will retrieve the library and install the `bolt` command line utility into
-your `$GOBIN` path.
+This will retrieve the library and update your `go.mod` and `go.sum` files.
 
+To run the command line utility, execute:
+```sh
+$ go run go.etcd.io/bbolt/cmd/bbolt@latest
+```
+
+Run `go install` to install the `bbolt` command line utility into
+your `$GOBIN` path, which defaults to `$GOPATH/bin` or `$HOME/go/bin` if the
+`GOPATH` environment variable is not set.
+```sh
+$ go install go.etcd.io/bbolt/cmd/bbolt@latest
+```
 
 ### Importing bbolt
 
@@ -94,7 +101,7 @@ To use bbolt as an embedded key-value store, import as:
 ```go
 import bolt "go.etcd.io/bbolt"
 
-db, err := bolt.Open(path, 0666, nil)
+db, err := bolt.Open(path, 0600, nil)
 if err != nil {
   return err
 }
@@ -152,11 +159,12 @@ are not thread safe. To work with data in multiple goroutines you must start
 a transaction for each one or use locking to ensure only one goroutine accesses
 a transaction at a time. Creating transaction from the `DB` is thread safe.
 
-Read-only transactions and read-write transactions should not depend on one
-another and generally shouldn't be opened simultaneously in the same goroutine.
-This can cause a deadlock as the read-write transaction needs to periodically
-re-map the data file but it cannot do so while a read-only transaction is open.
-
+Transactions should not depend on one another and generally shouldn't be opened
+simultaneously in the same goroutine. This can cause a deadlock as the read-write
+transaction needs to periodically re-map the data file but it cannot do so while
+any read-only transaction is open. Even a nested read-only transaction can cause
+a deadlock, as the child transaction can block the parent transaction from releasing
+its resources.
 
 #### Read-write transactions
 
@@ -275,7 +283,7 @@ should be writable.
 ### Using buckets
 
 Buckets are collections of key/value pairs within the database. All keys in a
-bucket must be unique. You can create a bucket using the `DB.CreateBucket()`
+bucket must be unique. You can create a bucket using the `Tx.CreateBucket()`
 function:
 
 ```go
@@ -283,6 +291,17 @@ db.Update(func(tx *bolt.Tx) error {
 	b, err := tx.CreateBucket([]byte("MyBucket"))
 	if err != nil {
 		return fmt.Errorf("create bucket: %s", err)
+	}
+	return nil
+})
+```
+
+You can retrieve an existing bucket using the `Tx.Bucket()` function:
+```go
+db.Update(func(tx *bolt.Tx) error {
+	b := tx.Bucket([]byte("MyBucket"))
+	if b == nil {
+		return fmt.Errorf("bucket does not exist")
 	}
 	return nil
 })
@@ -326,7 +345,17 @@ exists then it will return its byte slice value. If it doesn't exist then it
 will return `nil`. It's important to note that you can have a zero-length value
 set to a key which is different than the key not existing.
 
-Use the `Bucket.Delete()` function to delete a key from the bucket.
+Use the `Bucket.Delete()` function to delete a key from the bucket:
+
+```go
+db.Update(func (tx *bolt.Tx) error {
+    b := tx.Bucket([]byte("MyBucket"))
+    err := b.Delete([]byte("answer"))
+    return err
+})
+```
+
+This will delete the key `answers` from the bucket `MyBucket`.
 
 Please note that values returned from `Get()` are only valid while the
 transaction is open. If you need to use a value outside of the transaction
@@ -415,6 +444,11 @@ When you have iterated to the end of the cursor then `Next()` will return a
 `nil` key.  You must seek to a position using `First()`, `Last()`, or `Seek()`
 before calling `Next()` or `Prev()`. If you do not seek to a position then
 these functions will return a `nil` key.
+
+If you remove key/value pairs during iteration, the cursor may automatically
+move to the next position if present in current node each time removing a key.
+When you call `c.Next()` after removing a key, it may skip one key/value pair.  
+Refer to [pull/611](https://github.com/etcd-io/bbolt/pull/611) to get more detailed info.
 
 During iteration, if the key is non-`nil` but the value is `nil`, that means
 the key refers to a bucket rather than a value.  Use `Bucket.Bucket()` to
@@ -635,7 +669,7 @@ uses a shared lock to allow multiple processes to read from the database but
 it will block any processes from opening the database in read-write mode.
 
 ```go
-db, err := bolt.Open("my.db", 0666, &bolt.Options{ReadOnly: true})
+db, err := bolt.Open("my.db", 0600, &bolt.Options{ReadOnly: true})
 if err != nil {
 	log.Fatal(err)
 }
@@ -840,6 +874,12 @@ Here are a few things to note when evaluating and using Bolt:
   to grow. However, it's important to note that deleting large chunks of data
   will not allow you to reclaim that space on disk.
 
+* Removing key/values pairs in a bucket during iteration on the bucket using
+  cursor may not work properly. Each time when removing a key/value pair, the
+  cursor may automatically move to the next position if present. When users
+  call `c.Next()` after removing a key, it may skip one key/value pair.
+  Refer to https://github.com/etcd-io/bbolt/pull/611 for more detailed info.
+
   For more information on page allocation, [see this comment][page-allocation].
 
 [page-allocation]: https://github.com/boltdb/bolt/issues/308#issuecomment-74811638
@@ -907,12 +947,15 @@ Below is a list of public, open source projects that use Bolt:
 * [BoltStore](https://github.com/yosssi/boltstore) - Session store using Bolt.
 * [Boltdb Boilerplate](https://github.com/bobintornado/boltdb-boilerplate) - Boilerplate wrapper around bolt aiming to make simple calls one-liners.
 * [BoltDbWeb](https://github.com/evnix/boltdbweb) - A web based GUI for BoltDB files.
+* [BoltDB Viewer](https://github.com/zc310/rich_boltdb) - A BoltDB Viewer Can run on Windows、Linux、Android system.
 * [bleve](http://www.blevesearch.com/) - A pure Go search engine similar to ElasticSearch that uses Bolt as the default storage backend.
+* [bstore](https://github.com/mjl-/bstore) - Database library storing Go values, with referential/unique/nonzero constraints, indices, automatic schema management with struct tags, and a query API.
 * [btcwallet](https://github.com/btcsuite/btcwallet) - A bitcoin wallet.
 * [buckets](https://github.com/joyrexus/buckets) - a bolt wrapper streamlining
   simple tx and key scans.
 * [cayley](https://github.com/google/cayley) - Cayley is an open-source graph database using Bolt as optional backend.
 * [ChainStore](https://github.com/pressly/chainstore) - Simple key-value interface to a variety of storage engines organized as a chain of operations.
+* [🌰 Chestnut](https://github.com/jrapoport/chestnut) - Chestnut is encrypted storage for Go.
 * [Consul](https://github.com/hashicorp/consul) - Consul is service discovery and configuration made easy. Distributed, highly available, and datacenter-aware.
 * [DVID](https://github.com/janelia-flyem/dvid) - Added Bolt as optional storage engine and testing it against Basho-tuned leveldb.
 * [dcrwallet](https://github.com/decred/dcrwallet) - A wallet for the Decred cryptocurrency.
@@ -923,21 +966,22 @@ Below is a list of public, open source projects that use Bolt:
 * [GoWebApp](https://github.com/josephspurrier/gowebapp) - A basic MVC web application in Go using BoltDB.
 * [GoShort](https://github.com/pankajkhairnar/goShort) - GoShort is a URL shortener written in Golang and BoltDB for persistent key/value storage and for routing it's using high performent HTTPRouter.
 * [gopherpit](https://github.com/gopherpit/gopherpit) - A web service to manage Go remote import paths with custom domains
+* [gokv](https://github.com/philippgille/gokv) - Simple key-value store abstraction and implementations for Go (Redis, Consul, etcd, bbolt, BadgerDB, LevelDB, Memcached, DynamoDB, S3, PostgreSQL, MongoDB, CockroachDB and many more)
 * [Gitchain](https://github.com/gitchain/gitchain) - Decentralized, peer-to-peer Git repositories aka "Git meets Bitcoin".
 * [InfluxDB](https://influxdata.com) - Scalable datastore for metrics, events, and real-time analytics.
 * [ipLocator](https://github.com/AndreasBriese/ipLocator) - A fast ip-geo-location-server using bolt with bloom filters.
 * [ipxed](https://github.com/kelseyhightower/ipxed) - Web interface and api for ipxed.
 * [Ironsmith](https://github.com/timshannon/ironsmith) - A simple, script-driven continuous integration (build - > test -> release) tool, with no external dependencies
 * [Kala](https://github.com/ajvb/kala) - Kala is a modern job scheduler optimized to run on a single node. It is persistent, JSON over HTTP API, ISO 8601 duration notation, and dependent jobs.
-* [Key Value Access Langusge (KVAL)](https://github.com/kval-access-language) - A proposed grammar for key-value datastores offering a bbolt binding.
+* [Key Value Access Language (KVAL)](https://github.com/kval-access-language) - A proposed grammar for key-value datastores offering a bbolt binding.
 * [LedisDB](https://github.com/siddontang/ledisdb) - A high performance NoSQL, using Bolt as optional storage.
 * [lru](https://github.com/crowdriff/lru) - Easy to use Bolt-backed Least-Recently-Used (LRU) read-through cache with chainable remote stores.
 * [mbuckets](https://github.com/abhigupta912/mbuckets) - A Bolt wrapper that allows easy operations on multi level (nested) buckets.
 * [MetricBase](https://github.com/msiebuhr/MetricBase) - Single-binary version of Graphite.
 * [MuLiFS](https://github.com/dankomiocevic/mulifs) - Music Library Filesystem creates a filesystem to organise your music files.
-* [Operation Go: A Routine Mission](http://gocode.io) - An online programming game for Golang using Bolt for user accounts and a leaderboard.
-* [photosite/session](https://godoc.org/bitbucket.org/kardianos/photosite/session) - Sessions for a photo viewing site.
+* [NATS](https://github.com/nats-io/nats-streaming-server) - NATS Streaming uses bbolt for message and metadata storage.
 * [Prometheus Annotation Server](https://github.com/oliver006/prom_annotation_server) - Annotation server for PromDash & Prometheus service monitoring system.
+* [Rain](https://github.com/cenkalti/rain) - BitTorrent client and library.
 * [reef-pi](https://github.com/reef-pi/reef-pi) - reef-pi is an award winning, modular, DIY reef tank controller using easy to learn electronics based on a Raspberry Pi.
 * [Request Baskets](https://github.com/darklynx/request-baskets) - A web service to collect arbitrary HTTP requests and inspect them via REST API or simple web UI, similar to [RequestBin](http://requestb.in/) service
 * [Seaweed File System](https://github.com/chrislusf/seaweedfs) - Highly scalable distributed key~file system with O(1) disk read.

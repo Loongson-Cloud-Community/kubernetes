@@ -2,7 +2,6 @@ package watch
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"time"
@@ -63,19 +62,24 @@ func (p *PackageHash) CheckForChanges() bool {
 }
 
 func (p *PackageHash) computeHashes() (codeHash string, codeModifiedTime time.Time, testHash string, testModifiedTime time.Time, deleted bool) {
-	infos, err := ioutil.ReadDir(p.path)
+	entries, err := os.ReadDir(p.path)
 
 	if err != nil {
 		deleted = true
 		return
 	}
 
-	for _, info := range infos {
-		if info.IsDir() {
+	for _, entry := range entries {
+		if entry.IsDir() {
 			continue
 		}
 
-		if goTestRegExp.Match([]byte(info.Name())) {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		if goTestRegExp.MatchString(info.Name()) {
 			testHash += p.hashForFileInfo(info)
 			if info.ModTime().After(testModifiedTime) {
 				testModifiedTime = info.ModTime()
@@ -83,7 +87,7 @@ func (p *PackageHash) computeHashes() (codeHash string, codeModifiedTime time.Ti
 			continue
 		}
 
-		if p.watchRegExp.Match([]byte(info.Name())) {
+		if p.watchRegExp.MatchString(info.Name()) {
 			codeHash += p.hashForFileInfo(info)
 			if info.ModTime().After(codeModifiedTime) {
 				codeModifiedTime = info.ModTime()
