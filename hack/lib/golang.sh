@@ -27,6 +27,7 @@ readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/loong64
 )
 
 # The node platforms we build for
@@ -36,6 +37,7 @@ readonly KUBE_SUPPORTED_NODE_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/loong64
   windows/amd64
 )
 
@@ -48,6 +50,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/loong64
   darwin/amd64
   darwin/386
   windows/amd64
