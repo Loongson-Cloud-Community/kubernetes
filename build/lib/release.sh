@@ -29,7 +29,7 @@ readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
 readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-n}
-KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
+KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-n}
 
 # ---------------------------------------------------------------------------
 # Build final release artifacts
@@ -172,7 +172,7 @@ function kube::release::package_node_tarballs() {
 
 # Package up all of the server binaries in docker images
 function kube::release::build_server_images() {
-  kube::util::ensure-docker-buildx
+#  kube::util::ensure-docker-buildx
 
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
@@ -299,7 +299,7 @@ function kube::release::create_docker_images_for_server() {
     # registry.k8s.io is the constant tag in the docker archives, this is also the default for config scripts in GKE.
     # We can use KUBE_DOCKER_REGISTRY to include and extra registry in the docker archive.
     # If we use KUBE_DOCKER_REGISTRY="registry.k8s.io", then the extra tag (same) is ignored, see release_docker_image_tag below.
-    local -r docker_registry="registry.k8s.io"
+    local -r docker_registry="cr.loongnix.cn/kubernetes"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -337,10 +337,8 @@ function kube::release::create_docker_images_for_server() {
         ln "${binary_file_path}" "${docker_build_path}/${binary_name}"
 
         local build_log="${docker_build_path}/build.log"
-        if ! DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" buildx build \
+        if ! DOCKER_CLI_EXPERIMENTAL=enabled "${DOCKER[@]}" build \
           -f "${docker_file_path}" \
-          --platform linux/"${arch}" \
-          --load ${docker_build_opts:+"${docker_build_opts}"} \
           -t "${docker_image_tag}" \
           --build-arg BASEIMAGE="${base_image}" \
           --build-arg SETCAP_IMAGE="${KUBE_BUILD_SETCAP_IMAGE}" \

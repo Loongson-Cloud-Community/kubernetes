@@ -14,14 +14,14 @@
 
 .PHONY: all container clean orphan all-push push-manifest
 
-REGISTRY ?= staging-k8s.gcr.io
+REGISTRY ?= cr.loongnix.cn/kubernetes
 IMAGE = $(REGISTRY)/pause
 
 TAG ?= 3.9
 REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
-ARCH ?= amd64
+ARCH ?= loong64
 # Operating systems supported: linux, windows
 OS ?= linux
 # OS Version for the Windows images: 1809, ltsc2022
@@ -31,8 +31,8 @@ OSVERSION ?= 1809 ltsc2022
 # If it is registry, it will also allow us to push the Windows images.
 OUTPUT_TYPE ?= docker
 
-ALL_OS = linux windows
-ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
+ALL_OS = linux
+ALL_ARCH.linux = loong64
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
 ALL_OSVERSIONS.windows := 1809 ltsc2022
@@ -40,7 +40,7 @@ ALL_OS_ARCH.windows = $(foreach arch, $(ALL_ARCH.windows), $(foreach osversion, 
 ALL_OS_ARCH = $(foreach os, $(ALL_OS), ${ALL_OS_ARCH.${os}})
 
 CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
-KUBE_CROSS_IMAGE ?= registry.k8s.io/build-image/kube-cross
+KUBE_CROSS_IMAGE ?= cr.loongnix.cn/k8s-staging-build-image/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 # NOTE(claudiub): The Windows pause image also requires the wincat binary we're compiling for the
@@ -66,6 +66,7 @@ TRIPLE.linux-arm := arm-linux-gnueabihf
 TRIPLE.linux-arm64 := aarch64-linux-gnu
 TRIPLE.linux-ppc64le := powerpc64le-linux-gnu
 TRIPLE.linux-s390x := s390x-linux-gnu
+TRIPLE.linux-loong64 := loongarch64-linux-gnu
 TRIPLE := ${TRIPLE.${OS}-${ARCH}}
 BASE.linux := scratch
 # Source for windows pause image base is located at https://github.com/microsoft/windows-pause-image-base
@@ -122,8 +123,7 @@ bin/wincat-windows-${ARCH}: windows/wincat/wincat.go
 
 container: .container-${OS}-$(ARCH)
 .container-linux-$(ARCH): bin/$(BIN)-$(OS)-$(ARCH)
-	docker buildx build --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
-		-t $(IMAGE):$(TAG)-${OS}-$(ARCH) --build-arg BASE=${BASE} --build-arg ARCH=$(ARCH) .
+	docker build -t $(IMAGE):$(TAG)-${OS}-$(ARCH) --build-arg BASE=${BASE} --build-arg ARCH=$(ARCH) .
 	touch $@
 
 .container-windows-$(ARCH): $(foreach binary, ${BIN}, bin/${binary}-${OS}-${ARCH})

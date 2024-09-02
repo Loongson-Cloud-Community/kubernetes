@@ -55,3 +55,5 @@ ADD rsyncd.password /
 RUN chmod a+r /rsyncd.password
 ADD rsyncd.sh /
 RUN chmod a+rx /rsyncd.sh
+
+ENV GOPROXY="https://goproxy.cn,direct"

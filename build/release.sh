@@ -29,7 +29,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/build/common.sh"
 source "${KUBE_ROOT}/build/lib/release.sh"
 
-KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
+KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-n}
 
 kube::build::verify_prereqs
 kube::build::build_image

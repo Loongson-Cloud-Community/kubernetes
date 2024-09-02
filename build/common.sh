@@ -30,7 +30,7 @@ GROUP_ID=$(id -g)
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 IFS=" " read -r -a DOCKER <<< "docker ${DOCKER_OPTS}"
 DOCKER_HOST=${DOCKER_HOST:-""}
-GOPROXY=${GOPROXY:-""}
+GOPROXY=${GOPROXY:-"https://goproxy.cn,direct"}
 
 # This will canonicalize the path
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd -P)
@@ -42,8 +42,8 @@ readonly KUBE_BUILD_IMAGE_REPO=kube-build
 KUBE_BUILD_IMAGE_CROSS_TAG="$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"
 readonly KUBE_BUILD_IMAGE_CROSS_TAG
 
-readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-registry.k8s.io}"
-KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-registry.k8s.io/build-image}"
+readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-cr.loongnix.cn/kubernetes}"
+KUBE_BASE_IMAGE_REGISTRY="${KUBE_BASE_IMAGE_REGISTRY:-cr.loongnix.cn/k8s-staging-build-image}"
 readonly KUBE_BASE_IMAGE_REGISTRY
 
 # This version number is used to cause everyone to rebuild their data containers
@@ -96,9 +96,9 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_distroless_iptables_version=v0.4.3
-readonly __default_go_runner_version=v2.3.1-go1.21.5-bookworm.0
-readonly __default_setcap_version=bookworm-v1.0.0
+readonly __default_distroless_iptables_version=v0.3.2
+readonly __default_go_runner_version=v2.3.1-go1.21.0-buster.0
+readonly __default_setcap_version=buster-v1.0.0
 
 # These are the base images for the Docker-wrapped binaries.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
@@ -406,7 +406,7 @@ function kube::build::build_image() {
 # $3 is the value to set the --pull flag for docker build; true by default
 # $4 is the set of --build-args for docker.
 function kube::build::docker_build() {
-  kube::util::ensure-docker-buildx
+#  kube::util::ensure-docker-buildx
 
   local -r image=$1
   local -r context_dir=$2
@@ -414,7 +414,7 @@ function kube::build::docker_build() {
   local build_args
   IFS=" " read -r -a build_args <<< "$4"
   readonly build_args
-  local -ra build_cmd=("${DOCKER[@]}" buildx build --load -t "${image}" "--pull=${pull}" "${build_args[@]}" "${context_dir}")
+  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "${build_args[@]}" "${context_dir}")
 
   kube::log::status "Building Docker image ${image}"
   local docker_output
@@ -467,6 +467,7 @@ function kube::build::ensure_data_container() {
       --volume /usr/local/go/pkg/linux_arm_cgo
       --volume /usr/local/go/pkg/linux_arm64_cgo
       --volume /usr/local/go/pkg/linux_ppc64le_cgo
+      --volume /usr/local/go/pkg/linux_loong64_cgo
       --volume /usr/local/go/pkg/darwin_amd64_cgo
       --volume /usr/local/go/pkg/darwin_386_cgo
       --volume /usr/local/go/pkg/windows_amd64_cgo
